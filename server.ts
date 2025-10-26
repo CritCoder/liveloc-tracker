@@ -21,6 +21,10 @@ const viewerHTML = `<!DOCTYPE html>
       50% { opacity: 0.5; }
     }
     .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    
+    .notification-audio {
+      display: none;
+    }
   </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
@@ -118,6 +122,27 @@ const viewerHTML = `<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Notification Sounds -->
+  <audio id="newUserSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="locationUpdateSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-07a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-07a.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="testLocationSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-09a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-09a.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="errorSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-08a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-08a.mp3" type="audio/mpeg">
+  </audio>
+
   <script>
     // Initialize map
     let map = L.map('map').setView([0, 0], 2);
@@ -126,6 +151,37 @@ const viewerHTML = `<!DOCTYPE html>
     let userColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
     let colorIndex = 0;
     let hasSetInitialView = false;
+
+    // Notification sounds
+    function playNotificationSound(soundId) {
+      try {
+        const audio = document.getElementById(soundId);
+        if (audio) {
+          audio.currentTime = 0; // Reset to beginning
+          audio.play().catch(e => {
+            console.log('Could not play notification sound:', e);
+          });
+        }
+      } catch (error) {
+        console.log('Notification sound error:', error);
+      }
+    }
+
+    function playNewUserSound() {
+      playNotificationSound('newUserSound');
+    }
+
+    function playLocationUpdateSound() {
+      playNotificationSound('locationUpdateSound');
+    }
+
+    function playTestLocationSound() {
+      playNotificationSound('testLocationSound');
+    }
+
+    function playErrorSound() {
+      playNotificationSound('errorSound');
+    }
 
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -263,6 +319,13 @@ const viewerHTML = `<!DOCTYPE html>
             data.users.forEach(user => {
               if (!userMarkers[user.userId] || JSON.stringify(userMarkers[user.userId].data) !== JSON.stringify(user)) {
                 addActivity(user.userName + ' location updated - ' + Math.round(user.accuracy) + 'm accuracy');
+                
+                // Play notification sound for new user or location update
+                if (!userMarkers[user.userId]) {
+                  playNewUserSound(); // New user joined
+                } else {
+                  playLocationUpdateSound(); // Existing user location updated
+                }
               }
             });
           }
@@ -270,6 +333,7 @@ const viewerHTML = `<!DOCTYPE html>
       } catch (error) {
         console.error('Error fetching location:', error);
         updateStatus('Connection Error', false);
+        playErrorSound();
       }
     }
 
@@ -309,6 +373,10 @@ const clientHTML = `<!DOCTYPE html>
       50% { opacity: 0.5; }
     }
     .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    
+    .notification-audio {
+      display: none;
+    }
     
     .modal-overlay {
       position: fixed;
@@ -463,12 +531,64 @@ const clientHTML = `<!DOCTYPE html>
   </div>
   </div> <!-- End mainContent -->
 
+  <!-- Notification Sounds -->
+  <audio id="newUserSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="locationUpdateSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-07a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-07a.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="testLocationSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-09a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-09a.mp3" type="audio/mpeg">
+  </audio>
+  
+  <audio id="errorSound" class="notification-audio" preload="auto">
+    <source src="https://www.soundjay.com/misc/sounds/beep-08a.wav" type="audio/wav">
+    <source src="https://www.soundjay.com/misc/sounds/beep-08a.mp3" type="audio/mpeg">
+  </audio>
+
   <script>
     let isSharing = false;
     let hasPermission = false;
     let watchId = null;
     let updateCount = 0;
     let userId = null;
+
+    // Notification sounds
+    function playNotificationSound(soundId) {
+      try {
+        const audio = document.getElementById(soundId);
+        if (audio) {
+          audio.currentTime = 0; // Reset to beginning
+          audio.play().catch(e => {
+            console.log('Could not play notification sound:', e);
+          });
+        }
+      } catch (error) {
+        console.log('Notification sound error:', error);
+      }
+    }
+
+    function playNewUserSound() {
+      playNotificationSound('newUserSound');
+    }
+
+    function playLocationUpdateSound() {
+      playNotificationSound('locationUpdateSound');
+    }
+
+    function playTestLocationSound() {
+      playNotificationSound('testLocationSound');
+    }
+
+    function playErrorSound() {
+      playNotificationSound('errorSound');
+    }
 
     // Permission handling
     function showPermissionModal() {
@@ -546,9 +666,10 @@ const clientHTML = `<!DOCTYPE html>
                   break;
               }
               
-              alert(errorMessage);
-              // Keep showing modal until permission is granted
-              showPermissionModal();
+            alert(errorMessage);
+            playErrorSound();
+            // Keep showing modal until permission is granted
+            showPermissionModal();
             },
             {
               enableHighAccuracy: true,
@@ -617,13 +738,22 @@ const clientHTML = `<!DOCTYPE html>
           updateCount++;
           document.getElementById('updateCount').textContent = updateCount;
           updateStatus('Sharing location...', true);
+          
+          // Play notification sound for location update
+          if (updateCount === 1) {
+            playNewUserSound(); // First location share
+          } else {
+            playLocationUpdateSound(); // Subsequent updates
+          }
         } else {
           console.error('Server error:', responseData);
           updateStatus('Error sharing', false);
+          playErrorSound();
         }
       } catch (error) {
         console.error('Error sending location:', error);
         updateStatus('Error sharing', false);
+        playErrorSound();
       }
     }
 
@@ -738,9 +868,11 @@ const clientHTML = `<!DOCTYPE html>
 
         const result = await response.json();
         console.log('Test location response:', result);
+        playTestLocationSound();
         alert('Test location sent! Check the viewer.');
       } catch (error) {
         console.error('Error sending test location:', error);
+        playErrorSound();
         alert('Error sending test location');
       }
     }
