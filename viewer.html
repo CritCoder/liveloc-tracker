@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Location Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map { height: 600px; width: 100%; border-radius: 0.5rem; }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="bg-blue-600 p-3 rounded-full">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-3xl font-bold text-gray-800">Live Location Viewer</h1>
+            <p class="text-gray-600">Real-time tracking dashboard</p>
+          </div>
+        </div>
+        <div id="statusBadge" class="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-full">
+          <span class="w-3 h-3 bg-gray-500 rounded-full"></span>
+          <span class="font-medium">Waiting...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-sm text-gray-600 mb-1">Latitude</div>
+        <div id="latValue" class="text-2xl font-bold text-gray-800">--</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-sm text-gray-600 mb-1">Longitude</div>
+        <div id="lngValue" class="text-2xl font-bold text-gray-800">--</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-sm text-gray-600 mb-1">Accuracy</div>
+        <div id="accValue" class="text-2xl font-bold text-gray-800">--</div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-sm text-gray-600 mb-1">Last Update</div>
+        <div id="timeValue" class="text-2xl font-bold text-gray-800">--</div>
+      </div>
+    </div>
+
+    <!-- Main Map -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">Live Map</h2>
+        <button id="centerBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
+          Center on Location
+        </button>
+      </div>
+      <div id="map"></div>
+    </div>
+
+    <!-- Additional Info -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Location Details -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Location Details</h3>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center py-2 border-b">
+            <span class="text-gray-600">Speed</span>
+            <span id="speedValue" class="font-semibold text-gray-800">--</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b">
+            <span class="text-gray-600">Altitude</span>
+            <span id="altValue" class="font-semibold text-gray-800">--</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b">
+            <span class="text-gray-600">Heading</span>
+            <span id="headingValue" class="font-semibold text-gray-800">--</span>
+          </div>
+          <div class="flex justify-between items-center py-2">
+            <span class="text-gray-600">Updates Received</span>
+            <span id="updateCount" class="font-semibold text-gray-800">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Log -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Activity Log</h3>
+        <div id="activityLog" class="space-y-2 max-h-64 overflow-y-auto">
+          <div class="text-gray-500 text-sm">Waiting for location updates...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-6 text-center text-sm text-gray-600">
+      <p>Location data updates automatically every 2 seconds</p>
+    </div>
+  </div>
+
+  <script>
+    // Initialize map
+    let map = L.map('map').setView([0, 0], 2);
+    let updateCount = 0;
+    let userMarkers = {}; // userId -> {marker, circle}
+    let userColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+    let colorIndex = 0;
+    let hasSetInitialView = false;
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Get color for user
+    function getUserColor(userId) {
+      if (!userMarkers[userId]) {
+        return userColors[colorIndex++ % userColors.length];
+      }
+      return userMarkers[userId].color;
+    }
+
+    // Create custom marker icon with color and name
+    function createMarkerIcon(color, name) {
+      return L.divIcon({
+        className: 'custom-marker',
+        html: '<div class="relative"><div class="absolute w-6 h-6 rounded-full border-4 border-white shadow-lg pulse-dot" style="background-color:' + color + '"></div></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+    }
+
+    // Update status badge
+    function updateStatus(status, isActive) {
+      const badge = document.getElementById('statusBadge');
+      if (isActive) {
+        badge.className = 'flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full';
+        badge.innerHTML = '<span class="w-3 h-3 bg-green-500 rounded-full pulse-dot"></span><span class="font-medium">' + status + '</span>';
+      } else {
+        badge.className = 'flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-full';
+        badge.innerHTML = '<span class="w-3 h-3 bg-gray-500 rounded-full"></span><span class="font-medium">' + status + '</span>';
+      }
+    }
+
+    // Format time
+    function formatTime(date) {
+      return date.toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    // Add activity log entry
+    function addActivity(message) {
+      const log = document.getElementById('activityLog');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'text-sm p-2 bg-gray-50 rounded border-l-4 border-blue-500';
+      entry.innerHTML = '<span class="text-gray-500">' + time + '</span> - <span class="text-gray-800">' + message + '</span>';
+
+      if (log.firstChild && log.firstChild.classList.contains('text-gray-500')) {
+        log.innerHTML = '';
+      }
+
+      log.insertBefore(entry, log.firstChild);
+
+      // Keep only last 10 entries
+      while (log.children.length > 10) {
+        log.removeChild(log.lastChild);
+      }
+    }
+
+    // Update map with new locations for all users
+    function updateLocations(users) {
+      if (!users || users.length === 0) return;
+
+      users.forEach(user => {
+        const userId = user.userId;
+        const latLng = [user.latitude, user.longitude];
+        const color = getUserColor(userId);
+
+        // Remove old markers for this user
+        if (userMarkers[userId]) {
+          if (userMarkers[userId].marker) {
+            map.removeLayer(userMarkers[userId].marker);
+          }
+          if (userMarkers[userId].circle) {
+            map.removeLayer(userMarkers[userId].circle);
+          }
+        }
+
+        // Create marker
+        const marker = L.marker(latLng, { icon: createMarkerIcon(color, user.userName) }).addTo(map);
+        marker.bindPopup('<b>' + user.userName + '</b><br>Accuracy: ' + Math.round(user.accuracy) + 'm<br>Speed: ' + (user.speed ? (user.speed * 3.6).toFixed(1) + ' km/h' : 'N/A'));
+
+        // Create accuracy circle
+        const circle = L.circle(latLng, {
+          radius: user.accuracy,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.2,
+          weight: 2
+        }).addTo(map);
+
+        // Store markers
+        userMarkers[userId] = { marker, circle, color, data: user };
+
+        // Set initial view on first user
+        if (!hasSetInitialView) {
+          map.setView(latLng, 13);
+          hasSetInitialView = true;
+        }
+      });
+
+      // Update stats for first user (or could show summary)
+      if (users.length > 0) {
+        const firstUser = users[0];
+        document.getElementById('latValue').textContent = firstUser.latitude.toFixed(6);
+        document.getElementById('lngValue').textContent = firstUser.longitude.toFixed(6);
+        document.getElementById('accValue').textContent = Math.round(firstUser.accuracy) + 'm';
+        document.getElementById('timeValue').textContent = formatTime(new Date(firstUser.timestamp));
+        document.getElementById('updateCount').textContent = users.length;
+
+        document.getElementById('speedValue').textContent = firstUser.speed ? (firstUser.speed * 3.6).toFixed(1) + ' km/h' : 'N/A';
+        document.getElementById('altValue').textContent = firstUser.altitude ? firstUser.altitude.toFixed(1) + 'm' : 'N/A';
+        document.getElementById('headingValue').textContent = firstUser.heading ? firstUser.heading.toFixed(0) + '°' : 'N/A';
+      }
+
+      // Update status
+      updateStatus('Tracking ' + users.length + ' user(s)', true);
+      updateCount++;
+    }
+
+    // Fetch location from server
+    async function fetchLocation() {
+      try {
+        const response = await fetch('/api/latest-location');
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.ok && data.users) {
+            updateLocations(data.users);
+
+            // Log activity for each new user
+            data.users.forEach(user => {
+              if (!userMarkers[user.userId] || JSON.stringify(userMarkers[user.userId].data) !== JSON.stringify(user)) {
+                addActivity(user.userName + ' location updated - ' + Math.round(user.accuracy) + 'm accuracy');
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching location:', error);
+        updateStatus('Connection Error', false);
+      }
+    }
+
+    // Center map to show all users
+    document.getElementById('centerBtn').addEventListener('click', () => {
+      const markers = Object.values(userMarkers).map(u => u.marker);
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+        addActivity('Map centered on all tracked users');
+      }
+    });
+
+    // Poll for updates every 2 seconds
+    setInterval(fetchLocation, 2000);
+
+    // Initial fetch
+    fetchLocation();
+
+    // Add initial activity
+    addActivity('Viewer started - waiting for location data');
+  </script>
+</body>
+</html>
